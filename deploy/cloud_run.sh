@@ -48,7 +48,9 @@ gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member "serviceAc
 echo "building $IMAGE"
 gcloud builds submit --tag "$IMAGE" --project "$PROJECT" --quiet
 BASE_URL="${BASE_URL:-https://$SERVICE-$PROJECT_NUMBER.$REGION.run.app}"
-SECRETS="OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,APP_SECRET=APP_SECRET:latest,DATABASE_URL=DATABASE_URL:latest"
+SECRETS="OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest,APP_SECRET=APP_SECRET:latest,DATABASE_URL=DATABASE_URL:latest"
+# Optional secrets ride only when the env file has them: without Google OAuth the app still takes uploads and a local folder.
+[ -n "$(val GOOGLE_CLIENT_SECRET)" ] && SECRETS="$SECRETS,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest"
 [ -n "$(val APP_PASSWORD)" ] && SECRETS="$SECRETS,APP_PASSWORD=APP_PASSWORD:latest"
 gcloud run deploy "$SERVICE" --image "$IMAGE" --project "$PROJECT" --region "$REGION" \
   --allow-unauthenticated --min-instances 1 --max-instances 1 --no-cpu-throttling --memory 1Gi --cpu 1 --timeout 300 \
