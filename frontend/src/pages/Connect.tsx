@@ -24,6 +24,10 @@ export default function Connect({ me, refresh, mode }: { me: Me | null; refresh:
   useEffect(() => { const tick = () => get("/api/sync/status").then(setSync).catch(() => {}); tick(); const id = setInterval(tick, 5000); return () => clearInterval(id); }, []);
 
   const watch = async (r: string) => { setBusy(true); setMsg(""); try { const f = await post("/api/folders", { ref: r }); setMsg(`Watching “${f.name}”. First sync started.`); refresh(); } catch (e) { setMsg(String(e)); } finally { setBusy(false); } };
+  const disconnect = async () => {
+    if (!confirm("Disconnect Google Drive? The account and its folder are forgotten; documents already read stay in the library.")) return;
+    setBusy(true); try { await post("/api/auth/google/disconnect"); setMsg("Drive disconnected. Documents already read stay in the library."); setQ(""); setFolders([]); refresh(); } catch (e) { setMsg(String(e)); } finally { setBusy(false); }
+  };
   const syncNow = async () => { setBusy(true); try { const r = await post("/api/sync"); setMsg(describeSync(r.results)); refresh(); } catch (e) { setMsg(String(e)); } finally { setBusy(false); } };
 
   const pageRef = useRef<HTMLDivElement>(null);
@@ -41,7 +45,7 @@ export default function Connect({ me, refresh, mode }: { me: Me | null; refresh:
           ) : !signed ? (
             <a className="btn gold" href="/api/auth/google/start">Connect Google Drive</a>
           ) : (
-            <div className="row"><span>Signed in as <b>{me?.email}</b></span>{me?.reauth_required && <span className="chip failed">access expired</span>}{me?.reauth_required && <a className="btn sm" href="/api/auth/google/start">Reconnect</a>}</div>
+            <div className="row"><span>Signed in as <b>{me?.email}</b></span>{me?.reauth_required && <span className="chip failed">access expired</span>}{me?.reauth_required && <a className="btn sm" href="/api/auth/google/start">Reconnect</a>}<span style={{ flex: 1 }} /><button className="btn ghost sm" onClick={disconnect} disabled={busy} title="Forget this Google account and stop watching its folder; documents already read stay">Disconnect Drive</button></div>
           )}
           {signed && (<>
             <h3>Pick the folder to watch</h3>
@@ -80,7 +84,6 @@ export default function Connect({ me, refresh, mode }: { me: Me | null; refresh:
           <div data-tour="connect-reading">
           <h3>Reading</h3>
           {stats && (<div className="kv small">
-            <span className="k">Spent today</span><span>${Number(stats.today_cost_usd).toFixed(2)}{stats.daily_cost_cap_usd ? ` of a $${Number(stats.daily_cost_cap_usd).toFixed(2)} daily cap` : " (no daily cap set)"}</span>
             <span className="k">Reader version</span><span>{stats.prompt_version}{stats.outdated_documents ? ` · ${stats.outdated_documents} document${stats.outdated_documents === 1 ? "" : "s"} read with an older version` : " · everything is up to date"}</span>
           </div>)}
           <div className="row" style={{ marginTop: 8 }}>

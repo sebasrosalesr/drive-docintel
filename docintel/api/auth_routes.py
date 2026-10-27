@@ -4,13 +4,13 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import auth
 from ..config import settings
-from ..models import GoogleAccount, User, WatchedFolder
+from ..models import Document, DriveFile, GoogleAccount, User, WatchedFolder
 from .deps import get_session
 
 router = APIRouter(prefix="/api", tags=["auth"])
@@ -84,6 +84,33 @@ def google_callback(request: Request, code: str = "", state: str = "", error: st
     resp = RedirectResponse("/", status_code=302)
     auth.set_session(resp, user.id)
     resp.delete_cookie(auth.STATE_COOKIE)
+    return resp
+
+
+@router.post("/auth/google/disconnect")
+def google_disconnect(request: Request, session: Session = Depends(get_session)):
+    """Disconnect Drive: the account and its encrypted refresh token go, its
+    watched folders and their file rows go, and the session ends. Documents
+    already read stay in the library, no longer tied to a Drive file."""
+    user = auth.require_user(request, session)
+    accounts = session.scalars(select(GoogleAccount).where(GoogleAccount.user_id == user.id)).all()
+    folders = session.scalars(select(WatchedFolder).where(WatchedFolder.google_account_id.in_([a.id for a in accounts]))).all() if accounts else []
+    # No ORM relationships are declared, so the flushes order the deletes by hand: files, folders, accounts, user.
+    for folder in folders:
+        for df in session.scalars(select(DriveFile).where(DriveFile.watched_folder_id == folder.id)):
+            for doc in session.scalars(select(Document).where(Document.drive_file_id == df.id)):
+                doc.drive_file_id = None
+            session.delete(df)
+        session.flush()
+        session.delete(folder)
+    session.flush()
+    for account in accounts:
+        session.delete(account)
+    session.flush()
+    session.delete(user)
+    session.commit()
+    resp = JSONResponse({"ok": True, "folders": len(folders)})
+    auth.clear_session(resp)
     return resp
 
 
