@@ -72,9 +72,9 @@ def load() -> Settings:
     data_dir.mkdir(exist_ok=True)
     return Settings(
         openrouter_api_key=_s("OPENROUTER_API_KEY"),
-        model=_s("MODEL", "google/gemini-4-argon"),
-        ask_model=_s("ASK_MODEL") or _s("MODEL", "google/gemini-4-argon"),
-        fallback_model=_s("FALLBACK_MODEL") if os.getenv("FALLBACK_MODEL") is not None else "anthropic/claude-opus-5.5",
+        model=_s("MODEL", "anthropic/claude-opus-5.5"),
+        ask_model=_s("ASK_MODEL") or _s("MODEL", "anthropic/claude-opus-5.5"),
+        fallback_model=_s("FALLBACK_MODEL") if os.getenv("FALLBACK_MODEL") is not None else "google/gemini-4-argon",
         pdf_engine=_s("PDF_ENGINE", "native"),
         reasoning_effort=_s("REASONING_EFFORT", "medium"),
         table_reasoning_effort=_s("TABLE_REASONING_EFFORT", "low").lower(),
