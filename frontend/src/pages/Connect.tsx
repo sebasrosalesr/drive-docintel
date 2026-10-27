@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { describeSync, summarizeTick } from "../lib/syncSummary";
 import { useReveal } from "../lib/gsap";
 import type { Mode } from "../lib/labels";
 import { get, post, Me } from "../api";
@@ -23,7 +24,7 @@ export default function Connect({ me, refresh, mode }: { me: Me | null; refresh:
   useEffect(() => { const tick = () => get("/api/sync/status").then(setSync).catch(() => {}); tick(); const id = setInterval(tick, 5000); return () => clearInterval(id); }, []);
 
   const watch = async (r: string) => { setBusy(true); setMsg(""); try { const f = await post("/api/folders", { ref: r }); setMsg(`Watching “${f.name}”. First sync started.`); refresh(); } catch (e) { setMsg(String(e)); } finally { setBusy(false); } };
-  const syncNow = async () => { setBusy(true); try { const r = await post("/api/sync"); setMsg("Sync: " + JSON.stringify(r.results)); refresh(); } catch (e) { setMsg(String(e)); } finally { setBusy(false); } };
+  const syncNow = async () => { setBusy(true); try { const r = await post("/api/sync"); setMsg(describeSync(r.results)); refresh(); } catch (e) { setMsg(String(e)); } finally { setBusy(false); } };
 
   const pageRef = useRef<HTMLDivElement>(null);
   useReveal(pageRef, ".eyebrow, h1, .lede, .tablet");
@@ -69,7 +70,7 @@ export default function Connect({ me, refresh, mode }: { me: Me | null; refresh:
             <div className="kv">
               <span className="k">Watching</span><span><b>{me.folder.name}</b> <span className="mono muted">{me.folder.folder_id}</span></span>
               <span className="k">Last tick</span><span>{me.folder.last_tick_at ? me.folder.last_tick_at.replace("T", " ") + " UTC" : "—"}</span>
-              <span className="k">Last result</span><span className="mono small">{me.folder.last_tick_summary ? `${me.folder.last_tick_summary.listed} listed · ${me.folder.last_tick_summary.new} new · ${me.folder.last_tick_summary.changed} changed · ${me.folder.last_tick_summary.removed} removed` : "—"}</span>
+              <span className="k">Last result</span><span className="mono small">{summarizeTick(me.folder.last_tick_summary)}</span>
               <span className="k">Interval</span><span>every {sync?.interval_seconds ?? 60}s{sync?.thread_alive ? "" : " (loop not running)"}</span>
               <span className="k">Files</span><span className="small">{sync?.counts ? Object.entries(sync.counts).map(([k, v]) => `${k} ${v}`).join(" · ") : "—"}</span>
             </div>
