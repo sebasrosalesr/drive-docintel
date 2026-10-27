@@ -14,4 +14,5 @@ frontend/dist/
 docintel/static/
 .pytest_cache/
 .DS_Store
-gold/            # readings of your own documents; commit deliberately if you want a shared gold set
+# readings of your own documents; commit deliberately if you want a shared gold set
+gold/
