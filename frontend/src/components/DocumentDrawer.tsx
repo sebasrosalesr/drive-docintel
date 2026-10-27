@@ -17,18 +17,27 @@ export default function DocumentDrawer({ docId, onClose, mode, page }: { docId: 
   const showInOriginal = (text: string, pg: number) => { setLookFor({ text, page: pg }); setTab("original"); };
   const [tab, setTab] = useState<Tab>("original");
   const [full, setFull] = useState(false);
+  const [escalated, setEscalated] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [me, setMe] = useState<Me | null>(null);
   useEffect(() => { get<Me>("/api/me").then(setMe).catch(() => {}); }, []);
   useEffect(() => {
-    setDoc(null); setPrev(null); setErr(""); setTab("original"); setLookFor(null); setFull(false);
+    setDoc(null); setPrev(null); setErr(""); setTab("original"); setLookFor(null); setFull(false); setEscalated(false);
     if (docId == null) return;
     get(`/api/documents/${docId}`).then(setDoc).catch((e) => setErr(String(e)));
     get(`/api/documents/${docId}/preview`).then(setPrev).catch(() => setPrev({ kind: "text", text: "", note: "Preview unavailable" }));
     setVersions(null);
     get(`/api/documents/${docId}/versions`).then((r) => setVersions(r.versions)).catch(() => setVersions([]));
   }, [docId]);
+  const escalate = async () => {
+    setBusy(true);
+    try {
+      const r = await post(`/api/documents/${docId}/escalate`, { note: "" });
+      setEscalated(true);
+      setErr(r.sent ? "Engineering has been pinged." : `Not wired in this demo: in production this posts to the engineering channel (ESCALATION_WEBHOOK_URL). It would say: ${r.text}`);
+    } catch (e) { setErr(String(e)); } finally { setBusy(false); }
+  };
   const rerun = async (model?: string) => {
     setBusy(true);
     try { await post(`/api/documents/${docId}/rerun${model ? `?model=${encodeURIComponent(model)}` : ""}`); setErr(mode === "it" ? `Re-run queued${model ? ` with ${model}` : ""}.` : "Reading it again. This will update in a minute."); }
@@ -53,6 +62,7 @@ export default function DocumentDrawer({ docId, onClose, mode, page }: { docId: 
           {doc.status !== "rejected" && <a className="btn ghost sm" href={`/api/documents/${doc.document_id}/original`} target="_blank" rel="noreferrer">Download</a>}
           {doc.status !== "rejected" && <button className="btn sm" onClick={() => rerun()} disabled={busy} title={me?.model}>{it ? "Re-run" : "Read again"}</button>}
           {it && me?.model_b && me.model_b !== me.model && <button className="btn sm gold" onClick={() => rerun(me.model_b)} disabled={busy} title={me.model_b}>Re-run with model B</button>}
+          {(doc.status === "needs_review" || doc.status === "failed") && <button className="btn sm ghost" onClick={escalate} disabled={busy || escalated} title="Ping the engineering team to ingest this one from their end">{escalated ? "Sent to engineering" : "Send to engineering"}</button>}
         </div>
         {doc.summary && (
           <div className="summary">

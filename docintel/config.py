@@ -34,6 +34,8 @@ class Settings:
     reasoning_effort: str
     # Spreadsheets and CSVs are already structured: a lighter think is enough and several times faster.
     table_reasoning_effort: str
+    # Where "Send to engineering" posts (Slack-compatible JSON). Empty in the demo: the button then only shows what it would send.
+    escalation_webhook_url: str
     app_secret: str
     base_url: str
     database_url: str
@@ -78,6 +80,7 @@ def load() -> Settings:
         table_reasoning_effort=_s("TABLE_REASONING_EFFORT", "low").lower(),
         app_secret=_s("APP_SECRET", "dev-secret-change-me"),
         base_url=_s("BASE_URL", "http://localhost:8080").rstrip("/"),
+        escalation_webhook_url=_s("ESCALATION_WEBHOOK_URL"),
         database_url=_s("DATABASE_URL"),
         sync_interval_seconds=_i("SYNC_INTERVAL_SECONDS", 60),
         extract_concurrency=_i("EXTRACT_CONCURRENCY", 3),

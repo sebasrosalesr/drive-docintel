@@ -13,7 +13,10 @@ from pydantic import BaseModel
 from sqlalchemy import func, select, text, update
 from sqlalchemy.orm import Session
 
+import httpx
+
 from .. import sync
+from ..config import settings
 from ..models import Document, DriveFile, Fact, Fund, LLMCall, LocalFile, Observation
 from ..pipeline import load_blob, process_bytes
 from ..prompts import PROMPT_VERSION
@@ -252,6 +255,39 @@ def rerun(doc_id: int, effort: str | None = None, engine: str | None = None, mod
         raise HTTPException(409, "original bytes not kept; drop the file into Drive again")
     return {"accepted": True}
 
+
+
+class EscalateRequest(BaseModel):
+    note: str = ""
+
+
+def escalation_text(d: Document, note: str = "") -> str:
+    """One line a person on the engineering side can act on: the file, why it is
+    flagged in the validator's own words, the reviewer's note, and the link."""
+    flags = [f.get("msg", "") for f in (d.validation_json or {}).get("flags", []) if f.get("code") != "model_warning" and f.get("msg")]
+    why = "; ".join(flags[:4]) or (d.error or "").strip() or "flagged for review"
+    text = f"[DocIntel] \u201c{d.name}\u201d needs engineering ({d.status}): {why}."
+    if note.strip():
+        text += f" Note: {note.strip()[:500]}"
+    return f"{text} {settings.base_url}/#documents"
+
+
+@router.post("/documents/{doc_id}/escalate")
+def escalate(doc_id: int, body: EscalateRequest, session: Session = Depends(get_session)):
+    """Send to engineering. With ESCALATION_WEBHOOK_URL set, one POST of {text}
+    (Slack-compatible); without it, the demo, nothing leaves, and the reply
+    carries the message so the UI can show what would have been sent."""
+    d = session.get(Document, doc_id)
+    if d is None:
+        raise HTTPException(404, "no such document")
+    text = escalation_text(d, body.note)
+    if not settings.escalation_webhook_url:
+        return {"sent": False, "text": text}
+    try:
+        httpx.post(settings.escalation_webhook_url, json={"text": text}, timeout=10).raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(502, f"the engineering channel did not take it: {exc}") from exc
+    return {"sent": True, "text": text}
 
 
 def _obs_key(o: Observation, fund_norm: dict[int, str]) -> tuple:
