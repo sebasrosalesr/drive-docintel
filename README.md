@@ -61,30 +61,47 @@ Set `WATCH_DIR=/path/to/folder` in `.env` and restart. The same sync loop scans 
 
 ## Google Drive setup (10 minutes)
 
-1. Google Cloud console → a project → **APIs & Services → Library → enable "Google Drive API"**.
-2. **OAuth consent screen**: External, publishing status *Testing*, add the scopes `.../auth/drive.readonly`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`, `openid`; add yourself under *Test users*.
-3. **Credentials → Create → OAuth client ID → Web application**. Authorised redirect URI: `http://localhost:8080/api/auth/google/callback` (and the Cloud Run one if you deploy).
-4. Put the client id and secret in `.env` as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, restart, open the Connect page.
+The app signs people in with Google and reads their Drive with the read-only scope. One OAuth client serves local and deployed; the consent screen stays in *Testing* for a demo.
 
-Testing-mode consent expires after 7 days; the app notices the failed refresh and shows a *Reconnect* button.
+1. Google Cloud console, a project (the deployed instance uses the same project as the Cloud Run service): **APIs & Services → Library → enable "Google Drive API"**.
+2. **OAuth consent screen**: External, publishing status *Testing*. Scopes: `.../auth/drive.readonly`, `.../auth/userinfo.email`, `.../auth/userinfo.profile`, `openid`. Under **Test users** add every Google account that will sign in: yours and each reviewer's. Testing mode admits only listed accounts; anyone else sees Google's "access blocked" page. Publishing instead would mean Google's verification review for the Drive scope, weeks of work, so a demo stays in Testing.
+3. **Credentials → Create → OAuth client ID → Web application**, with both redirect URIs:
+   - `http://localhost:8080/api/auth/google/callback`
+   - `https://<your service URL>/api/auth/google/callback`
+4. Put the client id and secret in `.env` as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (download the client JSON from the console; the two values are `web.client_id` and `web.client_secret`), restart, open the Connect page.
 
-## Deploy (optional)
+What a test user sees on first sign-in: Google's "hasn't verified this app" screen. *Advanced → Go to Drive DocIntel* continues; then the Drive consent; then the Connect page to pick a folder. Testing-mode consent expires after 7 days; the app notices the failed refresh and shows a *Reconnect* button. Every signed-in account gets its own Drive connection and watched folder; the document library is shared.
 
-Frontend and backend are one service: the container serves the API and the built app from the same origin (no CORS, one OAuth redirect URL). Hosting shape:
+Two traps the sign-in flow handles, both met in production: the Google OAuth library (1.2+) generates a PKCE code verifier when the sign-in URL is built and wants it back at the token exchange, which runs in a different request, so the verifier rides the signed state cookie (`docintel/auth.py`); and `httplib2`, which the Google API client speaks through, is not thread-safe, so the Drive client hands each extraction worker its own authorized transport with a timeout (`docintel/drive.py`). Without the second, three downloads starting together ended as one "SSL record layer failure" and two silent hangs.
+
+## Deploy
+
+Frontend and backend are one service: the container serves the API and the built app from the same origin (no CORS, one OAuth redirect URL). The live demo runs exactly this shape on Google Cloud, with the database on Neon:
 
 | Piece | Where | Why |
 |---|---|---|
-| App (API + UI) | Cloud Run, one always-on instance (`min=max=1`, CPU not throttled) | the Drive watcher runs in-process; scale to zero + Cloud Scheduler if you prefer |
-| Database | Neon Postgres (`DATABASE_URL`) | Cloud Run's disk is wiped on restart, so SQLite is local-only |
-| Originals, sample corpus | a Cloud Storage bucket mounted at `/mnt/data` (`DATA_DIR`) | keeps "open original" and re-reads working across restarts |
-| Secrets | Secret Manager | OpenRouter key, Google client secret, app secret, database URL, app password |
+| App (API + UI) | Cloud Run, service `docintel`, one always-on instance (`min=max=1`, CPU not throttled), 1 vCPU / 1 GiB | the Drive watcher runs in-process; scale to zero + Cloud Scheduler if you prefer (commands in the script) |
+| Database | Neon Postgres, its own database (`docintel`) in an existing Neon project, through the **pooled** endpoint | Cloud Run's disk is wiped on restart, so SQLite is local-only. Neon's pooler is PgBouncer in transaction mode, where a prepared statement cached by one client is an "already exists" error for the next: `docintel/db.py` sets psycopg's `prepare_threshold=None` on Postgres |
+| Originals, sample corpus | a Cloud Storage bucket (`<project>-docintel-data`) mounted at `/mnt/data` (`DATA_DIR`) | keeps "open original" and re-reads working across restarts |
+| Secrets | Secret Manager: `OPENROUTER_API_KEY`, `GOOGLE_CLIENT_SECRET`, `APP_SECRET`, `DATABASE_URL`, `APP_PASSWORD` | the service account reads them at start; nothing sensitive is in the image or the env vars |
+| Public access | `--allow-unauthenticated`, or, where an organisation policy forbids `allUsers`, Cloud Run's *invoker IAM check disabled* | the app's own `APP_PASSWORD` gate is the lock either way |
+| Models | reader `MODEL=anthropic/claude-opus-5.5`, fallback `google/gemini-4-argon`, Ask `anthropic/claude-opus-5.5`, `TABLE_REASONING_EFFORT=low` | the demo's settings; a big spreadsheet reads in 30–40 s for ~$0.20, a small one in under 10 s for ~$0.03 |
 
 ```bash
-# .env: DATABASE_URL (Neon), GOOGLE_CLIENT_ID/SECRET, OPENROUTER_API_KEY, APP_SECRET, APP_PASSWORD
-PROJECT=<gcp-project> REGION=us-central1 bash deploy/cloud_run.sh
+# .env: DATABASE_URL (Neon, pooled host), GOOGLE_CLIENT_ID/SECRET, OPENROUTER_API_KEY, APP_SECRET, APP_PASSWORD
+gcloud auth login                                     # an owner of the project
+PROJECT=<gcp-project> REGION=us-central1 SERVICE=docintel bash deploy/cloud_run.sh
 ```
 
-The script enables the APIs, creates the Artifact Registry repo and the bucket, stores the secrets, builds with Cloud Build, deploys, and prints the URL to add to the OAuth client's redirect URIs.
+The script enables the APIs (Run, Cloud Build, Artifact Registry, Secret Manager), creates the Artifact Registry repo and the bucket, stores or re-versions the secrets from `.env`, builds the image with Cloud Build (about six minutes: the Node build of the SPA, then Python with Tesseract and poppler), deploys with the bucket mounted, and prints the URL to add to the OAuth client's redirect URIs. Google OAuth and the app password are optional: without the Google secret the app still takes uploads and a local folder.
+
+Things that bit while standing the demo up, so you don't have to meet them:
+
+- **Enable the Drive API in the same project** as the OAuth client, or the consent step fails with a cryptic error.
+- **Organisation policy `iam.allowedPolicyMemberDomains`** (common on Workspace-owned projects) refuses the `allUsers` invoker binding, so `--allow-unauthenticated` deploys the service but it answers 403. The fix is one command, after the deploy: `gcloud run services update docintel --no-invoker-iam-check --region us-central1`. It survives later deploys.
+- **Create the Neon database first** and point `DATABASE_URL` at it (`postgresql://user:pw@<pooled-host>/docintel`); the app creates its tables on first start. Keep it a separate database from anything else in the Neon project.
+- **Each deploy re-versions every secret from the machine's `.env`**, the app password included. With two machines deploying, keep their `.env` files in step or the password changes under you.
+- **Firebase Hosting in front of Cloud Run was not used on purpose**: Hosting strips every cookie except one reserved name, and the app signs in with three. The Cloud Run URL serves the SPA itself.
 
 ## Decisions worth explaining
 
@@ -146,7 +163,9 @@ Example Ask, real run: *"Which fund had the best January return?"* → "Sable Ri
 ## Operations
 
 - `TABLE_REASONING_EFFORT` (default `low`) is the think a spreadsheet or CSV gets; PDFs and prose keep `REASONING_EFFORT`. A small CSV read in 25 s at medium and a few seconds at low.
-- `APP_PASSWORD` locks every API route behind a sign-in screen (for a deployed demo). `DAILY_COST_CAP_USD` stops model calls once today's spend reaches the cap; the Connect page shows today's spend and the reader version, with "Re-read everything" / "Re-read the outdated" buttons.
+- `APP_PASSWORD` locks every API route behind a sign-in screen (for a deployed demo). `DAILY_COST_CAP_USD` stops model calls once today's spend reaches the cap (`0`, the demo's setting, means no cap); the Connect page shows today's spend and the reader version, with "Re-read everything" / "Re-read the outdated" buttons.
+- **Starting over** (a fresh test run on the deployed demo): truncate `observations, facts, llm_calls, documents, drive_files, local_files, funds, watched_folders` with `RESTART IDENTITY CASCADE`, keep `users` and `google_accounts` so sign-ins survive, and empty the bucket. The Connect page then offers the folder picker again and nothing re-reads until a folder is chosen.
+- **A stuck read**: a row left in `extracting` by a restart resets itself after 15 minutes; a `failed` row stays failed until re-run from the document's drawer or set back to `pending` on the database.
 - Document **History** (drawer tab) lists every reading of a file with a diff of figures against the previous one. **These look like the same fund** (Data page) suggests duplicate funds and merges them with one click, keeping the other name as an alias.
 - `.eml` attachments (PDF, CSV, Excel, Word…) are read as their own documents, linked to the email.
 
@@ -154,7 +173,7 @@ Example Ask, real run: *"Which fund had the best January return?"* → "Sable Ri
 
 - Fund identity is a normalised-name match with aliases; the duplicates panel catches the rest but needs a human click.
 - Legacy `.xls` / `.doc` / `.ppt` are skipped (`.xlsx` / `.docx` / `.pptx` work). Images (PNG, JPG, WebP, TIFF) are read as scans.
-- Single-user by design: one app password, no per-user roles or per-document permissions.
+- One app password and one shared library: every signed-in Google account has its own Drive connection and watched folder, but sees every document, and there are no per-user roles or per-document permissions.
 - Drive `changes.list` instead of listing, Cloud Scheduler instead of the in-process loop (commands in `deploy/cloud_run.sh`), and a BigQuery export of `observations` would be the production shape.
 
 Nothing in `corpus/` is real: five fictional managers, generated numbers.
