@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import io
 import re
+import threading
 from typing import Any, Protocol
 
+import httplib2
+from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
@@ -37,20 +40,38 @@ def parse_folder_ref(ref: str) -> str:
     raise ValueError("not a Drive folder URL or id")
 
 
+# One Drive client is shared by the sync loop and every extraction worker, but
+# httplib2 (what the Google client speaks through) is not thread-safe: three
+# downloads starting together on one connection end in "SSL record layer
+# failure" for one and a silent hang for the others. So the service object is
+# shared and each thread gets its own authorized transport, with a timeout so
+# a stalled download returns the worker instead of keeping it forever.
+HTTP_TIMEOUT = 120
+
+
 class GoogleDrive:
     def __init__(self, creds) -> None:
+        self.creds = creds
         self.svc = build("drive", "v3", credentials=creds, cache_discovery=False)
+        self._local = threading.local()
+
+    def _http(self):
+        http = getattr(self._local, "http", None)
+        if http is None:
+            http = AuthorizedHttp(self.creds, http=httplib2.Http(timeout=HTTP_TIMEOUT))
+            self._local.http = http
+        return http
 
     def list_folders(self, q: str = "") -> list[dict[str, Any]]:
         query = f"mimeType='{GOOGLE_FOLDER}' and trashed=false"
         if q.strip():
             query += f" and name contains '{_esc(q.strip())}'"
         res = self.svc.files().list(q=query, fields="files(id,name,modifiedTime,parents)", pageSize=100, orderBy="modifiedTime desc",
-                                    supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+                                    supportsAllDrives=True, includeItemsFromAllDrives=True).execute(http=self._http())
         return res.get("files", [])
 
     def folder_meta(self, folder_id: str) -> dict[str, Any]:
-        return self.svc.files().get(fileId=folder_id, fields="id,name,mimeType", supportsAllDrives=True).execute()
+        return self.svc.files().get(fileId=folder_id, fields="id,name,mimeType", supportsAllDrives=True).execute(http=self._http())
 
     def walk_folder(self, folder_id: str, max_depth: int = 6) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
@@ -64,7 +85,7 @@ class GoogleDrive:
             token = None
             while True:
                 res = self.svc.files().list(q=f"'{fid}' in parents and trashed=false", fields=LIST_FIELDS, pageSize=200,
-                                            pageToken=token, supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+                                            pageToken=token, supportsAllDrives=True, includeItemsFromAllDrives=True).execute(http=self._http())
                 for f in res.get("files", []):
                     mt = f.get("mimeType", "")
                     if mt == GOOGLE_FOLDER:
@@ -73,7 +94,7 @@ class GoogleDrive:
                         tgt = (f.get("shortcutDetails") or {})
                         if tgt.get("targetMimeType") and tgt.get("targetMimeType") != GOOGLE_FOLDER and tgt.get("targetId"):
                             try:
-                                meta = self.svc.files().get(fileId=tgt["targetId"], fields=FILE_FIELDS, supportsAllDrives=True).execute()
+                                meta = self.svc.files().get(fileId=tgt["targetId"], fields=FILE_FIELDS, supportsAllDrives=True).execute(http=self._http())
                                 meta["path"] = path
                                 out.append(meta)
                             except Exception:  # noqa: BLE001  dangling shortcut
@@ -87,6 +108,7 @@ class GoogleDrive:
         return out
 
     def _drain(self, request) -> bytes:
+        request.http = self._http()  # the chunked download reads the transport off the request
         buf = io.BytesIO()
         dl = MediaIoBaseDownload(buf, request, chunksize=8 * 1024 * 1024)
         done = False
