@@ -4,7 +4,7 @@
 
 **Point it at a Google Drive folder of messy fund documents. Get one queryable table, with every number traced back to the line it came from.**
 
-![Python 3.12](https://img.shields.io/badge/Python-3.12-0B1424?labelColor=0B1424&color=C9A84C) ![FastAPI](https://img.shields.io/badge/FastAPI-SQLAlchemy_2-0B1424?labelColor=0B1424&color=C9A84C) ![React 18](https://img.shields.io/badge/React_18-Vite-0B1424?labelColor=0B1424&color=C9A84C) ![Claude via OpenRouter](https://img.shields.io/badge/Claude-via_OpenRouter-0B1424?labelColor=0B1424&color=C9A84C) ![tests](https://img.shields.io/badge/tests-67_pytest_·_11_vitest-0B1424?labelColor=0B1424&color=C9A84C)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-0B1424?labelColor=0B1424&color=C9A84C) ![FastAPI](https://img.shields.io/badge/FastAPI-SQLAlchemy_2-0B1424?labelColor=0B1424&color=C9A84C) ![React 18](https://img.shields.io/badge/React_18-Vite-0B1424?labelColor=0B1424&color=C9A84C) ![Claude via OpenRouter](https://img.shields.io/badge/Claude-via_OpenRouter-0B1424?labelColor=0B1424&color=C9A84C) ![tests](https://img.shields.io/badge/tests-68_pytest_·_11_vitest-0B1424?labelColor=0B1424&color=C9A84C)
 
 </div>
 
@@ -29,16 +29,16 @@ Drive folder · local folder · upload ──sync (60 s)──▶ files ──�
 
 ```bash
 git clone <this repo> && cd drive-docintel
-python3.12 -m venv .venv && . .venv/bin/activate      # 3.12–3.14 work
+python3.12 -m venv .venv && . .venv/bin/activate      # 3.12
 pip install -r requirements-dev.txt
 brew install tesseract poppler                         # optional: OCR tiers for scans (apt: tesseract-ocr poppler-utils)
 cp .env.example .env                                   # set OPENROUTER_API_KEY (everything else has defaults)
-pytest                                                 # 60 tests, no network (set DATABASE_URL to run them against Postgres)
+pytest                                                 # 68 tests, no network (set DATABASE_URL to run them against Postgres)
 
 python scripts/make_corpus.py --out corpus             # 13 synthetic documents (PDF, scan, HTML, CSV, Excel, Word) from 5 fictional managers + answer_key.json
-python scripts/run_local.py corpus                     # runs them through the same pipeline the Drive sync uses (~$0.46 on Gemini 4 Argon)
+python scripts/run_local.py corpus                     # runs them through the same pipeline the Drive sync uses (~$0.85 with the default Opus reader; ~$0.46 with --model google/gemini-4-argon)
 python scripts/eval_extraction.py corpus/answer_key.json   # recall / precision / evidence table
-(cd frontend && npm test)                              # vitest: labels + Markdown renderer
+(cd frontend && npm test)                              # 11 vitest tests: labels, Markdown, the sync summary, the full-window preview
 
 (cd frontend && npm ci && npm run build)
 uvicorn docintel.main:app --port 8080                  # open http://localhost:8080 — the tutorial starts on first visit
@@ -129,10 +129,10 @@ docintel/            FastAPI app
   pipeline.py                          one file: render → gate → model → normalize → validate → persist (+ email attachments)
   sync.py drive.py localfolder.py auth.py   Drive diff + scheduler · Drive API · local watched folder · Google OAuth + app password
   ask/registry.py ask/guard.py ask/agent.py library digest, passage search, page reader · read-only SQL guard · tool loop + citation audit
-  api/                                 routes (documents, data, facts, funds, ask, tutorial, upload)
+  api/                                 ask_routes · auth_routes (app password, Google sign-in, Disconnect Drive) · data_routes (documents, facts, funds, export, re-run, escalate, tutorial, upload) · drive_routes (folders, sync)
 frontend/            Vite + React + TypeScript: Connect, Documents, Data, Ask chat; Tour (interactive tutorial), Loaders (GSAP status glyphs), DocumentDrawer, Preview, Markdown; palette and type follow equi.com (forest #0f2319, lime #dff9ba, golden beige #c9b69a, ingot gold #e0a920, cream #f8f6f1; Inter + Newsreader standing in for Untitled Sans + Rizoma), all as CSS variables in `src/styles.css`
 scripts/             make_corpus.py · run_local.py · eval_extraction.py · gold_export.py · eval_gold.py · reverify.py · seed_fake.py (dev only)
-tests/               60 pytest tests (SQLite by default, Postgres via DATABASE_URL), no network; frontend: 6 vitest tests
+tests/               68 pytest tests (SQLite by default, Postgres via DATABASE_URL), no network; frontend: 11 vitest tests
 docs/                DEMO_SCRIPT.md (the tour as a script) · loader-preview.html
 deploy/cloud_run.sh  APIs, bucket, secrets, build, deploy
 ```
@@ -162,9 +162,9 @@ Example Ask, real run: *"Which fund had the best January return?"* → "Sable Ri
 
 ## Operations
 
-- `TABLE_REASONING_EFFORT` (default `low`) is the think a spreadsheet or CSV gets; PDFs and prose keep `REASONING_EFFORT`. A small CSV read in 25 s at medium and a few seconds at low.
-- `APP_PASSWORD` locks every API route behind a sign-in screen (for a deployed demo). `DAILY_COST_CAP_USD` stops model calls once today's spend reaches the cap (`0`, the demo's setting, means no cap); the Connect page shows today's spend and the reader version, with "Re-read everything" / "Re-read the outdated" buttons.
-- **Starting over** (a fresh test run on the deployed demo): truncate `observations, facts, llm_calls, documents, drive_files, local_files, funds, watched_folders` with `RESTART IDENTITY CASCADE`, keep `users` and `google_accounts` so sign-ins survive, and empty the bucket. The Connect page then offers the folder picker again and nothing re-reads until a folder is chosen.
+- `TABLE_REASONING_EFFORT` (default `low`) is the think a spreadsheet or CSV gets; PDFs and prose keep `REASONING_EFFORT`. A small spreadsheet read in 25 s at medium and under 10 s at low; a large one in 30–40 s.
+- `APP_PASSWORD` locks every API route behind a sign-in screen (for a deployed demo). `DAILY_COST_CAP_USD` stops model calls once today's spend reaches the cap (`0`, the demo's setting, means no cap); the Connect page shows the reader version with "Re-read everything" / "Re-read the outdated" buttons (the demo shows no spend figure).
+- **Starting over** (a fresh test run on the deployed demo): truncate `observations, facts, llm_calls, documents, drive_files, local_files, funds, watched_folders` with `RESTART IDENTITY CASCADE`, keep `users` and `google_accounts` so sign-ins survive, and empty the bucket. The Connect page then offers the folder picker again and nothing re-reads until a folder is chosen. From the UI, *Disconnect Drive* on the Connect page is the per-account version of this.
 - **Send to engineering**: a document in `needs_review` or `failed` has a button that pings the engineering team to ingest it from their end, one Slack-shaped POST to `ESCALATION_WEBHOOK_URL` with the file, the validator's reasons and the link. The demo leaves the URL unset on purpose: the button then shows the message it would have sent, and nothing leaves.
 - **A stuck read**: a row left in `extracting` by a restart resets itself after 15 minutes; a `failed` row stays failed until re-run from the document's drawer or set back to `pending` on the database.
 - Document **History** (drawer tab) lists every reading of a file with a diff of figures against the previous one. **These look like the same fund** (Data page) suggests duplicate funds and merges them with one click, keeping the other name as an alias.
