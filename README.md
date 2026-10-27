@@ -8,7 +8,7 @@
 
 </div>
 
-Take-home for Equi, Option A (Document Intelligence Web App, Google Drive integration). **Walkthrough:** instead of a video, the app carries an interactive tutorial. It starts on first visit and can be replayed from the *Tutorial* button in the header: thirteen spotlight steps across Connect, Documents, Data and Ask, each with the decision behind it, and two live actions (open a document, ask the January question). On an empty library it offers to load the 13-document sample corpus with one click.
+**Drive DocIntel** is a document intelligence web app for fund documents. It connects to Google Drive, watches a folder, reads every factsheet, statement, report, email and spreadsheet that lands there with an LLM, and turns them into one table you can filter, search and question, every figure traced to the line it came from. Built for Equi's take-home (Option A). **Walkthrough:** instead of a video, the app carries an interactive tutorial. It starts on first visit and can be replayed from the *Tutorial* button in the header: thirteen spotlight steps across Connect, Documents, Data and Ask, each with the decision behind it, and two live actions (open a document, ask the January question). On an empty library it offers to load the 13-document sample corpus with one click.
 
 ## What it does
 
