@@ -27,9 +27,12 @@ def _url() -> str:
 DB_URL = _url()
 IS_SQLITE = DB_URL.startswith("sqlite")
 
+# prepare_threshold=None: Neon's pooled endpoint is PgBouncer in transaction mode, where a
+# server connection is shared across clients; a prepared statement cached by one is an
+# "already exists" error for the next. Disabling psycopg's cache is the cost of pooling.
 engine = create_engine(
     DB_URL,
-    connect_args={"check_same_thread": False} if IS_SQLITE else {},
+    connect_args={"check_same_thread": False} if IS_SQLITE else {"prepare_threshold": None},
     pool_pre_ping=not IS_SQLITE,
 )
 
