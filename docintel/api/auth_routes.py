@@ -51,9 +51,9 @@ def me(request: Request, session: Session = Depends(get_session)):
 
 @router.get("/auth/google/start")
 def google_start():
-    url, state = auth.authorization_url()
+    url, state, verifier = auth.authorization_url()
     resp = RedirectResponse(url, status_code=302)
-    resp.set_cookie(auth.STATE_COOKIE, state, max_age=600, httponly=True, samesite="lax", secure=not settings.is_local)
+    resp.set_cookie(auth.STATE_COOKIE, auth.pack_state(state, verifier), max_age=auth.STATE_MAX_AGE, httponly=True, samesite="lax", secure=not settings.is_local)
     return resp
 
 
@@ -61,10 +61,10 @@ def google_start():
 def google_callback(request: Request, code: str = "", state: str = "", error: str = "", session: Session = Depends(get_session)):
     if error:
         raise HTTPException(400, f"Google returned: {error}")
-    expected = request.cookies.get(auth.STATE_COOKIE, "")
-    if not code or not state or not expected or not secrets.compare_digest(state, expected):
+    packed = auth.unpack_state(request.cookies.get(auth.STATE_COOKIE))
+    if not code or not state or not packed or not secrets.compare_digest(state, packed[0]):
         raise HTTPException(400, "OAuth state mismatch; start again")
-    creds = auth.exchange_code(code)
+    creds = auth.exchange_code(code, packed[1])
     info = auth.userinfo(creds)
     email = (info.get("email") or "").lower()
     user = session.scalar(select(User).where(User.email == email))

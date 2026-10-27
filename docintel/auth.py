@@ -61,14 +61,45 @@ def _flow() -> Flow:
     return Flow.from_client_config(cfg, scopes=SCOPES, redirect_uri=redirect_uri())
 
 
-def authorization_url() -> tuple[str, str]:
-    return _flow().authorization_url(access_type="offline", prompt="consent", include_granted_scopes="true")
+# PKCE: google-auth-oauthlib (1.2+) generates a code verifier when the sign-in
+# URL is built and needs the same one back at the exchange. The two happen in
+# different requests here, each with a fresh Flow, so the verifier rides the
+# signed state cookie beside the state itself.
+_state_signer = URLSafeTimedSerializer(settings.app_secret, salt="oauth-state")
+STATE_MAX_AGE = 600
 
 
-def exchange_code(code: str) -> Credentials:
+def authorization_url() -> tuple[str, str, str]:
+    """(url, state, code_verifier) for one sign-in."""
     flow = _flow()
+    url, state = flow.authorization_url(access_type="offline", prompt="consent", include_granted_scopes="true")
+    return url, state, flow.code_verifier or ""
+
+
+def exchange_code(code: str, code_verifier: str | None = None) -> Credentials:
+    flow = _flow()
+    if code_verifier:
+        flow.code_verifier = code_verifier
     flow.fetch_token(code=code)
     return flow.credentials
+
+
+def pack_state(state: str, code_verifier: str) -> str:
+    """The state cookie's value: state and verifier, signed, ten minutes."""
+    return _state_signer.dumps({"state": state, "verifier": code_verifier})
+
+
+def unpack_state(raw: str | None) -> tuple[str, str] | None:
+    """(state, verifier) from the cookie, or None when it is missing, forged or stale."""
+    if not raw:
+        return None
+    try:
+        data = _state_signer.loads(raw, max_age=STATE_MAX_AGE)
+    except BadSignature:
+        return None
+    if not isinstance(data, dict) or not data.get("state"):
+        return None
+    return str(data["state"]), str(data.get("verifier") or "")
 
 
 def userinfo(creds: Credentials) -> dict[str, Any]:
