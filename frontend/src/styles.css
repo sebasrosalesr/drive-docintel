@@ -285,6 +285,8 @@ a { color: var(--forest-2); }
 .tour-dim { position: absolute; inset: 0; background: rgba(15,35,25,.35); }
 .tour-spot { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(15,35,25,.55), 0 0 0 2px var(--lime); pointer-events: none; transition: none; }
 .tour-card { position: fixed; width: 420px; max-width: calc(100vw - 32px); background: var(--paper); border: 1px solid var(--vein); border-left: 3px solid var(--lime); border-radius: 4px 16px 16px 16px; padding: 16px 20px 14px; box-shadow: 0 20px 50px rgba(15,35,25,.25); z-index: 51; }
+/* Hidden from a step change until the spotlight has found the new target; the fade-in then runs once. */
+.tour-card.pending { opacity: 0; pointer-events: none; }
 .tour-card h2 { font-size: 23px; margin: 2px 0 6px; }
 .tour-card p { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; }
 .tour-decision { margin-top: 10px; padding: 8px 12px; border-left: 3px solid var(--beige); background: #faf7f0; font-size: 13px; line-height: 1.5; color: var(--ink-2); border-radius: 0 8px 8px 0; }

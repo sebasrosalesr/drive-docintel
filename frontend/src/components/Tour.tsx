@@ -50,39 +50,67 @@ function waitFor(selector: string, timeout = 2500): Promise<HTMLElement | null> 
 export default function Tour({ open, onClose, startAt = 0 }: { open: boolean; onClose: () => void; startAt?: number }) {
   const [i, setI] = useState(startAt);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  // Which step the spotlight has been placed for. The card stays hidden
+  // from a step change until its target is scrolled to and measured, and
+  // fades in once — keyed on this, never on the rectangle, which also
+  // changes on every scroll tick while the page glides to the target.
+  const [placedFor, setPlacedFor] = useState(-1);
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const spot = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const step = STEPS[Math.min(i, STEPS.length - 1)];
 
-  useEffect(() => { if (open) { setI(startAt); get("/api/tutorial/status").then(setStatus).catch(() => {}); } }, [open, startAt]);
+  useEffect(() => {
+    if (!open) return;
+    // A reopened tour starts unplaced: no stale spotlight, no card before its target is found.
+    setI(startAt); setRect(null); setPlacedFor(-1);
+    get("/api/tutorial/status").then(setStatus).catch(() => {});
+  }, [open, startAt]);
 
   const place = useCallback(async () => {
     if (!open) return;
     if (step.page && location.hash.replace("#", "") !== step.page) { location.hash = step.page; await new Promise((r) => setTimeout(r, 350)); }
-    if (!step.target) { setRect(null); return; }
+    if (!step.target) { setRect(null); setPlacedFor(i); return; }
     const el = await waitFor(step.target);
-    if (!el) { setRect(null); return; }
+    if (!el) { setRect(null); setPlacedFor(i); return; }
     const tall = el.getBoundingClientRect().height > window.innerHeight * 0.7;
     el.scrollIntoView({ block: tall ? "start" : "center", behavior: reduced() ? "auto" : "smooth" });
     await new Promise((r) => setTimeout(r, reduced() ? 50 : 450));
     setRect(clip(el.getBoundingClientRect()));
-  }, [open, step]);
+    setPlacedFor(i);
+  }, [open, step, i]);
 
   useEffect(() => { place(); }, [place]);
   useEffect(() => {
     if (!open) return;
-    const re = () => { if (step.target) { const el = document.querySelector(step.target) as HTMLElement | null; if (el) setRect(clip(el.getBoundingClientRect())); } };
+    // Follow the target through resizes and scrolls, but only when it moved:
+    // a fresh DOMRect per event would re-render and re-tween for nothing.
+    const re = () => {
+      if (!step.target) return;
+      const el = document.querySelector(step.target) as HTMLElement | null;
+      if (!el) return;
+      const r = clip(el.getBoundingClientRect());
+      setRect((prev) => (prev && Math.abs(prev.top - r.top) < 0.5 && Math.abs(prev.left - r.left) < 0.5 && Math.abs(prev.width - r.width) < 0.5 && Math.abs(prev.height - r.height) < 0.5 ? prev : r));
+    };
     window.addEventListener("resize", re); window.addEventListener("scroll", re, true);
     return () => { window.removeEventListener("resize", re); window.removeEventListener("scroll", re, true); };
   }, [open, step]);
 
+  // The spotlight glides to each new rectangle. Its inline style is written
+  // only when it mounts (see below), so React never snaps it ahead of the tween.
   useGSAP(() => {
-    if (!open || reduced()) return;
-    if (rect && spot.current) gsap.to(spot.current, { top: rect.top - 8, left: rect.left - 8, width: rect.width + 16, height: rect.height + 16, duration: 0.5, ease: "power3.out" });
-    if (card.current) gsap.fromTo(card.current, { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out", clearProps: "transform,opacity" });
-  }, { dependencies: [rect, i, open] });
+    if (!open || !rect || !spot.current) return;
+    const box = { top: rect.top - 8, left: rect.left - 8, width: rect.width + 16, height: rect.height + 16 };
+    if (reduced()) gsap.set(spot.current, box);
+    else gsap.to(spot.current, { ...box, duration: 0.5, ease: "power3.out", overwrite: "auto" });
+  }, { dependencies: [rect, open] });
+
+  // The card fades in once per step, when that step has been placed.
+  useGSAP(() => {
+    if (!open || reduced() || placedFor !== i || !card.current) return;
+    gsap.fromTo(card.current, { y: 10, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out", clearProps: "transform,opacity", overwrite: "auto" });
+  }, { dependencies: [placedFor, open] });
 
   const finish = () => { localStorage.setItem(DONE_KEY, "1"); onClose(); };
   const next = async () => {
@@ -103,8 +131,15 @@ export default function Tour({ open, onClose, startAt = 0 }: { open: boolean; on
     try { const r = await post("/api/tutorial/sample"); setStatus({ ...(status || {}), queued: r.queued }); } catch (e) { setStatus({ ...(status || {}), error: String(e) }); } finally { setLoading(false); }
   };
 
+  // The rectangle the spotlight mounted with: inline style for the first
+  // paint, then GSAP owns the box. Reset when the spotlight leaves.
+  const mountRect = useRef<DOMRect | null>(null);
+  if (!rect) mountRect.current = null;
+  else if (!mountRect.current) mountRect.current = rect;
+
   if (!open) return null;
   const centered = !rect;
+  const pending = placedFor !== i;
   const W = 420, H = 300, G = 22, vw = window.innerWidth, vh = window.innerHeight;
   let cardStyle: React.CSSProperties = { top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
   if (rect) {
@@ -118,8 +153,8 @@ export default function Tour({ open, onClose, startAt = 0 }: { open: boolean; on
   return (
     <div className="tour" role="dialog" aria-modal="true" aria-label="Tutorial">
       <div className="tour-dim" onClick={finish} />
-      {rect && <div ref={spot} className="tour-spot" style={{ top: rect.top - 8, left: rect.left - 8, width: rect.width + 16, height: rect.height + 16 }} />}
-      <div ref={card} className={`tour-card ${centered ? "center" : ""}`} style={cardStyle}>
+      {rect && mountRect.current && <div ref={spot} className="tour-spot" style={{ top: mountRect.current.top - 8, left: mountRect.current.left - 8, width: mountRect.current.width + 16, height: mountRect.current.height + 16 }} />}
+      <div ref={card} className={`tour-card ${centered ? "center" : ""} ${pending ? "pending" : ""}`} style={cardStyle}>
         <div className="eyebrow">Tutorial · {i + 1} of {STEPS.length}</div>
         <h2>{step.title}</h2>
         <p>{step.body}</p>
