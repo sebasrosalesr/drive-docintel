@@ -127,7 +127,7 @@ Example Ask, real run: *"Which fund had the best January return?"* → "Sable Ri
 
 ## Gold set for real documents
 
-`python scripts/gold_export.py <doc ids>` writes one JSON per document with its current figures and facts; correct them by hand, commit `gold/`, and `python scripts/eval_gold.py` scores every later reading against them (recall and precision for figures and facts, plus type / as-of checks). That is how prompt or model changes get measured on your own documents rather than on the synthetic corpus.
+`python scripts/gold_export.py <doc ids>` writes one JSON per document with its current figures and facts; correct them by hand (they stay local: `gold/` is git-ignored because it holds your documents' contents), and `python scripts/eval_gold.py` scores every later reading against them (recall and precision for figures and facts, plus type / as-of checks). That is how prompt or model changes get measured on your own documents rather than on the synthetic corpus.
 
 ## Operations
 
