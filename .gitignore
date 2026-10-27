@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+data/
+corpus/
+*.db
+*.db-*
+client_secret*.json
+token*.json
+var/
+node_modules/
+frontend/dist/
+docintel/static/
+.pytest_cache/
+.DS_Store
+# gold/ is meant to be committed once reviewed; keep it

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Loader candidates</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Cormorant+Garamond:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--marble:#f6f2ea;--marble-2:#efe9dd;--vein:#e3dccd;--ink:#14161c;--muted:#6d7078;--navy:#0f1f3d;--gold:#c9a84c;--gold-text:#7d6520;--gold-light:#f1e6c6;--paper:#fffdf8;--laurel:#4f6b4a}
+  body{margin:0;background:var(--marble);font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:var(--ink);padding:36px}
+  h1{font-family:"Cormorant Garamond",serif;font-weight:600;font-size:34px;color:var(--navy);margin:0 0 4px}
+  .lede{color:var(--muted);max-width:720px;margin:0 0 24px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:1100px}
+  .card{background:var(--paper);border:1px solid var(--vein);border-left:3px solid var(--gold);border-radius:4px 16px 16px 16px;padding:16px 20px}
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-text);margin-bottom:8px}
+  .status{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--gold-text);min-height:28px}
+  .status svg{width:28px;height:28px;overflow:visible}
+  .note{font-size:12.5px;color:var(--muted);margin-top:8px}
+  .row{display:flex;gap:28px;flex-wrap:wrap;margin-top:6px}
+  .rule{position:relative;height:2px;background:var(--vein);border-radius:2px;margin-top:10px;overflow:hidden}
+  .rule i{position:absolute;top:0;left:-40%;width:40%;height:100%;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+  .trail{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;border:1px solid var(--vein);background:var(--marble-2);color:var(--muted)}
+  .pill.done{background:#e6efe3;color:var(--laurel);border-color:transparent}
+  .pill.live{background:var(--gold-light);color:var(--gold-text);border-color:rgba(201,168,76,.45)}
+  .pill svg{width:12px;height:12px}
+  .caret{display:inline-block;width:2px;height:1em;background:var(--gold);vertical-align:-2px;margin-left:2px}
+  .answer{font-size:15px;line-height:1.6}
+</style></head><body>
+<h1>Loader candidates for the chat</h1>
+<p class="lede">Each one maps to a phase the backend already reports (connecting, searching, reading, querying, writing). All are inline SVG animated with GSAP, honour reduced motion, and use only the navy and gold already in the theme.</p>
+<div class="grid">
+
+<div class="card"><div class="eyebrow">A · Phase glyphs (one icon per tool)</div>
+  <div class="row">
+    <div class="status"><svg viewBox="0 0 28 28" id="lens"><rect x="4" y="6" width="14" height="18" rx="2" fill="none" stroke="#0f1f3d" stroke-width="1.5"/><rect x="7" y="3" width="14" height="18" rx="2" fill="#fffdf8" stroke="#0f1f3d" stroke-width="1.5"/><line x1="10" y1="8" x2="18" y2="8" stroke="#c9a84c" stroke-width="1.5"/><line x1="10" y1="12" x2="18" y2="12" stroke="#c9a84c" stroke-width="1.5"/><line x1="10" y1="16" x2="15" y2="16" stroke="#c9a84c" stroke-width="1.5"/><g id="lensg"><circle cx="18" cy="18" r="5" fill="rgba(201,168,76,.18)" stroke="#0f1f3d" stroke-width="1.8"/><line x1="22" y1="22" x2="26" y2="26" stroke="#0f1f3d" stroke-width="2" stroke-linecap="round"/></g></svg>Searching the documents for “minimum investment”</div>
+    <div class="status"><svg viewBox="0 0 28 28" id="read"><rect x="5" y="3" width="18" height="22" rx="2" fill="#fffdf8" stroke="#0f1f3d" stroke-width="1.5"/><rect id="hl" x="7" y="7" width="14" height="4" fill="rgba(201,168,76,.35)"/><g stroke="#0f1f3d" stroke-width="1.5" stroke-linecap="round"><line class="ln" x1="8" y1="9" x2="20" y2="9"/><line class="ln" x1="8" y1="13" x2="20" y2="13"/><line class="ln" x1="8" y1="17" x2="17" y2="17"/><line class="ln" x1="8" y1="21" x2="19" y2="21"/></g></svg>Reading “Morgan Private Capital…”, pages 3–5</div>
+    <div class="status"><svg viewBox="0 0 28 28" id="bars"><line x1="4" y1="24" x2="26" y2="24" stroke="#0f1f3d" stroke-width="1.5"/><rect class="bar" x="6" y="12" width="3.5" height="12" fill="#c9a84c"/><rect class="bar" x="11" y="8" width="3.5" height="16" fill="#0f1f3d"/><rect class="bar" x="16" y="14" width="3.5" height="10" fill="#c9a84c"/><rect class="bar" x="21" y="5" width="3.5" height="19" fill="#0f1f3d"/></svg>Querying the figures</div>
+    <div class="status"><svg viewBox="0 0 28 28" id="quill"><path id="ink" d="M4 22 C 9 20, 11 24, 16 21 S 23 18, 25 20" fill="none" stroke="#c9a84c" stroke-width="2" stroke-linecap="round"/><g id="nib"><path d="M0 0 L 7 -12 L 9 -10 L 2 1 Z" fill="#0f1f3d"/><circle cx="1" cy="0" r="1.2" fill="#c9a84c"/></g></svg>Writing the answer</div>
+  </div>
+  <div class="note">Recommended. The icon tells you what is happening before you read the words, and it changes as the tools change.</div>
+</div>
+
+<div class="card"><div class="eyebrow">B · The two-circle mark, breathing</div>
+  <div class="status"><svg viewBox="0 0 28 28" id="mark"><circle id="c1" cx="11" cy="14" r="7" fill="none" stroke="#0f1f3d" stroke-width="1.8"/><circle id="c2" cx="17" cy="14" r="7" fill="none" stroke="#c9a84c" stroke-width="1.8"/></svg>Reading the question and the library</div>
+  <div class="note">Your Aurelian two-circle mark as the idle/connecting state: navy and gold circles slide apart and back, overlapping like a lens. Quiet, branded, works at any size.</div>
+</div>
+
+<div class="card"><div class="eyebrow">C · Gold ink rule under the status</div>
+  <div class="status"><svg viewBox="0 0 28 28" id="mark2"><circle cx="11" cy="14" r="7" fill="none" stroke="#0f1f3d" stroke-width="1.8"/><circle cx="17" cy="14" r="7" fill="none" stroke="#c9a84c" stroke-width="1.8"/></svg>Searching the documents</div>
+  <div class="rule"><i id="shim"></i></div>
+  <div class="note">An indeterminate progress rule: a gold shimmer travelling along a thin vein-coloured line under the status. Pairs with A or B; it reads as “working” even when the text has not changed for a few seconds.</div>
+</div>
+
+<div class="card"><div class="eyebrow">D · Step trail (the work as it happens)</div>
+  <div class="trail" id="trail">
+    <span class="pill done"><svg viewBox="0 0 12 12"><path d="M2 6.5 L5 9 L10 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Searched · 8 passages</span>
+    <span class="pill done"><svg viewBox="0 0 12 12"><path d="M2 6.5 L5 9 L10 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Read 3 pages</span>
+    <span class="pill live"><svg viewBox="0 0 12 12"><circle id="spin" cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="14 10"/></svg>Querying the figures</span>
+  </div>
+  <div class="note">Instead of one status line, the steps accumulate as small pills with a check drawn in when each finishes. You see the trail of work, and it stays after the answer as the compact version of “Show the work”.</div>
+</div>
+
+<div class="card"><div class="eyebrow">E · Gold caret while the answer streams</div>
+  <div class="answer">The <b>Middle Market Private Equity Fund</b> has the largest target size, at <b>$4B</b>. It’s on page 10 of<span class="caret" id="caret"></span></div>
+  <div class="note">During token streaming the dots disappear and a blinking gold caret sits at the end of the text, like a cursor. Cheap, and it makes the streaming feel alive.</div>
+</div>
+
+<div class="card"><div class="eyebrow">F · Skeleton lines (before the first token)</div>
+  <div id="skel"><div style="height:10px;border-radius:5px;background:var(--marble-2);margin:6px 0;width:92%"></div><div style="height:10px;border-radius:5px;background:var(--marble-2);margin:6px 0;width:78%"></div><div style="height:10px;border-radius:5px;background:var(--marble-2);margin:6px 0;width:60%"></div></div>
+  <div class="note">Three shimmering placeholder lines where the answer will appear, so the card already has the shape of an answer while the model thinks.</div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/MotionPathPlugin.min.js"></script>
+<script>
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  // A
+  gsap.to("#lensg", { x: -8, y: -8, duration: 1.1, ease: "sine.inOut", repeat: -1, yoyo: true });
+  gsap.fromTo("#lensg circle", { attr: { r: 5 } }, { attr: { r: 5.8 }, duration: 0.55, repeat: -1, yoyo: true, ease: "sine.inOut" });
+  gsap.to("#hl", { y: 12, duration: 1.6, ease: "none", repeat: -1 });
+  gsap.fromTo("#read .ln", { opacity: .35 }, { opacity: 1, duration: .4, stagger: { each: .4, repeat: -1, yoyo: true } });
+  gsap.fromTo("#bars .bar", { scaleY: 0.2, transformOrigin: "50% 100%" }, { scaleY: 1, duration: .7, ease: "power2.out", stagger: { each: .15, repeat: -1, yoyo: true, repeatDelay: .3 } });
+  const ink = document.getElementById("ink"), L = ink.getTotalLength();
+  gsap.set(ink, { strokeDasharray: L, strokeDashoffset: L });
+  gsap.registerPlugin(MotionPathPlugin);
+  const tl = gsap.timeline({ repeat: -1, repeatDelay: .5 });
+  tl.to(ink, { strokeDashoffset: 0, duration: 1.6, ease: "power1.inOut" }, 0)
+    .to("#nib", { motionPath: { path: "#ink", align: "#ink", alignOrigin: [0.1, 1], autoRotate: false }, duration: 1.6, ease: "power1.inOut" }, 0)
+    .to("#nib", { y: "-=5", opacity: 0, duration: .3 }, ">")
+    .set("#nib", { opacity: 1 });
+  // B, C
+  const breathe = (id) => { const t = gsap.timeline({ repeat: -1, yoyo: true, defaults: { duration: 1.2, ease: "sine.inOut" } }); t.to(id + " circle:first-child", { x: -2.5 }, 0).to(id + " circle:last-child", { x: 2.5 }, 0); return t; };
+  breathe("#mark"); breathe("#mark2");
+  gsap.to("#shim", { left: "100%", duration: 1.6, ease: "power1.inOut", repeat: -1 });
+  // D, E, F
+  gsap.to("#spin", { rotation: 360, transformOrigin: "50% 50%", duration: 1, ease: "none", repeat: -1 });
+  gsap.to("#caret", { opacity: 0, duration: .5, repeat: -1, yoyo: true, ease: "steps(1)" });
+  gsap.to("#skel div", { opacity: .45, duration: .8, stagger: .15, repeat: -1, yoyo: true, ease: "sine.inOut" });
+}
+</script></body></html>
