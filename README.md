@@ -4,7 +4,7 @@
 
 **Point it at a Google Drive folder of messy fund documents. Get one queryable table, with every number traced back to the line it came from.**
 
-![Python 3.12](https://img.shields.io/badge/Python-3.12-0B1424?labelColor=0B1424&color=C9A84C) ![FastAPI](https://img.shields.io/badge/FastAPI-SQLAlchemy_2-0B1424?labelColor=0B1424&color=C9A84C) ![React 18](https://img.shields.io/badge/React_18-Vite-0B1424?labelColor=0B1424&color=C9A84C) ![Claude via OpenRouter](https://img.shields.io/badge/Claude-via_OpenRouter-0B1424?labelColor=0B1424&color=C9A84C) ![tests](https://img.shields.io/badge/tests-39_passing-0B1424?labelColor=0B1424&color=C9A84C)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-0B1424?labelColor=0B1424&color=C9A84C) ![FastAPI](https://img.shields.io/badge/FastAPI-SQLAlchemy_2-0B1424?labelColor=0B1424&color=C9A84C) ![React 18](https://img.shields.io/badge/React_18-Vite-0B1424?labelColor=0B1424&color=C9A84C) ![Claude via OpenRouter](https://img.shields.io/badge/Claude-via_OpenRouter-0B1424?labelColor=0B1424&color=C9A84C) ![tests](https://img.shields.io/badge/tests-60_pytest_·_6_vitest-0B1424?labelColor=0B1424&color=C9A84C)
 
 </div>
 
@@ -13,16 +13,16 @@ Take-home for Equi, Option A (Document Intelligence Web App, Google Drive integr
 ## What it does
 
 1. **Connect** Google with OAuth and pick a folder (or paste its URL).
-2. **Sync** runs every 60 s and on demand: every PDF, HTML email, `.eml`, CSV, Excel, Word, Google Doc or Sheet in the folder tree is diffed against what was already read. New or changed files are processed; files that disappear are retired.
-3. **Extract**: one prompt and one strict JSON schema for every document, whatever it is. PDFs and images go to the model as PDFs/images (it reads the page, so there is no per-layout parser and scans work). HTML, email, CSV, Excel, Word and PowerPoint are rendered to text. Every document gets a **title, a plain-English summary and key points**; performance figures come back as `fund · metric · period · value · unit · basis`; everything else with a value (minimums, target sizes, rates, closing dates, terms) comes back as **facts**. Each figure and fact carries a **verbatim evidence fragment** and a confidence.
+2. **Sync** runs every 60 s and on demand: every PDF, image, HTML email, `.eml` (and its attachments), CSV, Excel, Word, PowerPoint, Google Doc or Sheet in the folder tree is diffed against what was already read. New or changed files are processed; files that disappear are retired. The same watcher can point at a folder on the machine (`WATCH_DIR`), and the Documents page takes drag-and-drop uploads.
+3. **Screen, then extract**: a local PII gate rejects identity documents before anything is sent and masks SSN / card / account numbers in the rest. Then one prompt and one strict JSON schema for every document, whatever it is. PDFs and images go to the model as PDFs/images (it reads the page, so there is no per-layout parser and scans work). HTML, email, CSV, Excel, Word and PowerPoint are rendered to text. Every document gets a **title, a plain-English summary and key points**; performance figures come back as `fund · metric · period · value · unit · basis`; everything else with a value (minimums, target sizes, rates, closing dates, terms) comes back as **facts**. Each figure and fact carries a **verbatim evidence fragment** and a confidence.
 4. **Store** in a long fact table (`observations`) under SQLAlchemy. SQLite locally, Postgres in the cloud. Validation flags (ranges, dates, months that don't compound to the stated year, unverifiable evidence) send a document to `needs_review` instead of silently accepting it.
-5. **Browse** documents and figures, filter by fund / manager / metric / period, open a document to see the **original in its own form** (PDF viewer, spreadsheet grid for CSV and Excel, a Word-style page, an email view) next to each number and the line it was read from, export CSV. Two views of the same data: **Team** (plain language: "Fund factsheet", "Needs a look: no as-of date was found") and **IT** (status codes, model, cost, engine, extracted text, raw JSON, re-run with model B).
-6. **Ask the library** in plain English, as a chat with memory. The model sees the registry (one line per document in its context) and three tools: `search_documents` (passages across titles, summaries, key points, facts and page text), `read_document` (summary, facts and up to six pages of text), and `run_sql` (read-only views of figures and facts). Answers stream token by token (`POST /api/ask/stream`, NDJSON events) and cite `[doc:N p.3]`, `[fact:N]`, `[obs:N]`; every citation is audited against what the tools returned, the source documents are listed under the answer, and clicking one opens the original at that page. Suggested questions are generated from what is actually in the library.
+5. **Browse** documents and figures, filter by fund / manager / metric / period, open a document to see the **original in its own form** (PDF viewer, spreadsheet grid for CSV and Excel, a Word-style page, an email view) next to each number and the line it was read from, export CSV. Everything is in plain language by default ("Fund factsheet", "Needs a look: no as-of date was found"); a technical view with status codes, model, cost, engine, extracted text, raw JSON and *re-run with model B* is one URL parameter away (`?view=it`). Each document also keeps its **History** (every reading, with a diff), and near-duplicate fund names can be merged from the Data page.
+6. **Ask the library** in plain English, as a chat with memory. The model sees the registry (one line per document in its context) and three tools: `search_documents` (passages across titles, summaries, key points, facts and page text), `read_document` (summary, facts and up to six pages of text), and `run_sql` (read-only views of figures and facts). Answers stream token by token (`POST /api/ask/stream`, NDJSON events) and cite `[doc:N p.3]`, `[fact:N]`, `[obs:N]`; every citation is audited against what the tools returned, the source documents are listed under the answer, and clicking one opens the original at that page.
 
 ```
-Google Drive folder ──sync (60 s)──▶ drive_files ──▶ render ──▶ Claude (strict JSON schema) ──▶ normalize + validate ──▶ documents / funds / observations
-                                                                                                                                       │
-        Connect · Documents · Data · Ask  ◀──────────────────────── FastAPI /api ◀─── run_sql (read-only, allowlisted views) ◀─────────┘
+Drive folder · local folder · upload ──sync (60 s)──▶ files ──▶ render (+ OCR tiers) ──▶ PII gate ──▶ model (strict JSON schema) ──▶ normalize + validate
+                                                                                                                                              │
+   Connect · Documents · Data · Ask  ◀──── FastAPI /api ◀──── search_documents · read_document · run_sql ◀──── documents · funds · observations · facts
 ```
 
 ## Quick start (local, no Google needed)
@@ -31,8 +31,9 @@ Google Drive folder ──sync (60 s)──▶ drive_files ──▶ render ─�
 git clone <this repo> && cd drive-docintel
 python3.12 -m venv .venv && . .venv/bin/activate      # 3.12–3.14 work
 pip install -r requirements-dev.txt
+brew install tesseract poppler                         # optional: OCR tiers for scans (apt: tesseract-ocr poppler-utils)
 cp .env.example .env                                   # set OPENROUTER_API_KEY (everything else has defaults)
-pytest                                                 # 39 tests, no network
+pytest                                                 # 60 tests, no network (set DATABASE_URL to run them against Postgres)
 
 python scripts/make_corpus.py --out corpus             # 13 synthetic documents (PDF, scan, HTML, CSV, Excel, Word) from 5 fictional managers + answer_key.json
 python scripts/run_local.py corpus                     # runs them through the same pipeline the Drive sync uses (~$0.46 on Gemini 4 Argon)
@@ -40,7 +41,7 @@ python scripts/eval_extraction.py corpus/answer_key.json   # recall / precision 
 (cd frontend && npm test)                              # vitest: labels + Markdown renderer
 
 (cd frontend && npm ci && npm run build)
-uvicorn docintel.main:app --port 8080                  # open http://localhost:8080
+uvicorn docintel.main:app --port 8080                  # open http://localhost:8080 — the tutorial starts on first visit
 ```
 
 The Documents, Data and Ask pages work on the locally ingested corpus. `scripts/run_local.py` is the pipeline without Drive, which is also how to re-test extraction after changing the prompt.
@@ -95,28 +96,33 @@ The script enables the APIs, creates the Artifact Registry repo and the bucket, 
 - **Ask = registry + three tools + audit.** The library digest in the prompt lets the model pick documents by id; `search_documents` is a small term-overlap ranker over per-page text (no vector store needed at this scale); `read_document` is bounded to ~6 pages a call; `run_sql` is allowlisted at the SQL level (SELECT only, only `v_observations`, `v_documents`, `v_facts`, `funds`, one statement, LIMIT) and again by the database (SQLite authorizer that denies `ATTACH`, `PRAGMA`, other tables and `raw_text`; Postgres read-only transaction with a statement timeout). Citation markers are kept only if the id appeared in a tool result; anything else is shown as *unverified*. For a BigQuery shop the most legible answer is still the query, and it is shown.
 - **Large spreadsheets never go to the model row by row.** Above ~120 rows, one call sees the header, a dozen sample rows and per-column summaries and returns a *column mapping* (`docintel/tabular.py`); code applies it to every row, so a 10,000-row export costs the same as a 100-row one and the rows themselves stay on the machine.
 - **Polling over push.** A recursive `files.list` every minute is a handful of quota units and gives removals for free. Dedupe key is `md5Checksum` for binaries and `version + modifiedTime` for Google-native files (which have no md5); `sha256(bytes)` dedupes identical content. The upgrade path is `changes.list` with a stored page token; push notifications need a public HTTPS endpoint and weekly channel renewal and were not worth it here.
-- **Idempotent, inspectable failures.** A file is `pending → extracting → done | needs_review | failed | skipped`. Failures keep the error on the row, cost and tokens are logged per call, originals are kept so *Re-run extraction* works, and a crash mid-extraction is reset after 15 minutes.
+- **Idempotent, inspectable failures.** A file is `pending → extracting → done | needs_review | failed | skipped | rejected`. Failures keep the error on the row, cost and tokens are logged per call, originals are kept so *Re-run extraction* works, and a crash mid-extraction is reset after 15 minutes.
 - **Prompt injection.** Document content is wrapped as data in the user turn with an explicit rule; the model is asked to report embedded instructions as warnings. The SQL tool never sees document text except as cell values, which the Ask prompt treats as data.
 
 ## Layout
 
 ```
 docintel/            FastAPI app
-  config.py db.py models.py           settings · engine + the two read views · SQLAlchemy models
-  schema.py prompts.py llm.py         extraction schema · prompts · OpenRouter client (injectable transport)
-  render.py normalize.py validate.py  bytes→text · fund identity, periods, evidence check · sanity flags
-  pipeline.py sync.py drive.py auth.py  one file through the pipeline · Drive diff + scheduler · Drive API · OAuth
-  ask/guard.py ask/agent.py           read-only SQL guard · tool loop + citation audit
-  api/                                routes
-frontend/            Vite + React + TypeScript (Connect, Documents, Data, Ask chat); GSAP via @gsap/react for entrances and the chat loaders, honours prefers-reduced-motion; palette and type follow equi.com (forest #0f2319, lime #dff9ba, golden beige #c9b69a, ingot gold #e0a920, cream #f8f6f1; Inter + Instrument Serif standing in for Untitled Sans + Rizoma), all as CSS variables in `src/styles.css`
-scripts/             make_corpus.py · run_local.py · eval_extraction.py · seed_fake.py (dev only)
-tests/               39 pytest tests, no network
-deploy/cloud_run.sh  build, secrets, deploy
+  config.py db.py models.py            settings · engine, migrations and the three read views · SQLAlchemy models
+  schema.py prompts.py llm.py          extraction + table-mapping schemas · prompts · OpenRouter client (streaming, cost cap, injectable transport)
+  render.py preview.py                 bytes→text with OCR tiers (PDF, image, HTML, .eml, CSV, XLSX, DOCX, PPTX) · native previews for the drawer
+  pii.py                               local PII gate: identity documents rejected, identifiers masked
+  tabular.py                           column mapping applied to every row of large spreadsheets
+  normalize.py validate.py             fund identity, periods, evidence verification · sanity flags
+  pipeline.py                          one file: render → gate → model → normalize → validate → persist (+ email attachments)
+  sync.py drive.py localfolder.py auth.py   Drive diff + scheduler · Drive API · local watched folder · Google OAuth + app password
+  ask/registry.py ask/guard.py ask/agent.py library digest, passage search, page reader · read-only SQL guard · tool loop + citation audit
+  api/                                 routes (documents, data, facts, funds, ask, tutorial, upload)
+frontend/            Vite + React + TypeScript: Connect, Documents, Data, Ask chat; Tour (interactive tutorial), Loaders (GSAP status glyphs), DocumentDrawer, Preview, Markdown; palette and type follow equi.com (forest #0f2319, lime #dff9ba, golden beige #c9b69a, ingot gold #e0a920, cream #f8f6f1; Inter + Newsreader standing in for Untitled Sans + Rizoma), all as CSS variables in `src/styles.css`
+scripts/             make_corpus.py · run_local.py · eval_extraction.py · gold_export.py · eval_gold.py · reverify.py · seed_fake.py (dev only)
+tests/               60 pytest tests (SQLite by default, Postgres via DATABASE_URL), no network; frontend: 6 vitest tests
+docs/                DEMO_SCRIPT.md (the tour as a script) · loader-preview.html
+deploy/cloud_run.sh  APIs, bucket, secrets, build, deploy
 ```
 
 ## Measured on the synthetic corpus
 
-`scripts/eval_extraction.py` scores the database against `corpus/answer_key.json` (every monthly return and key statistic the documents print). Same prompt, same schema, two models through OpenRouter, 11 documents:
+`scripts/eval_extraction.py` scores the database against `corpus/answer_key.json` (every monthly return and key statistic the documents print). Same prompt, same schema, two models through OpenRouter, the 11 original documents (the Excel and Word files added later also score 100 %):
 
 | | `anthropic/claude-opus-5.5` | `google/gemini-4-argon` |
 |---|---|---|
@@ -147,7 +153,7 @@ Example Ask, real run: *"Which fund had the best January return?"* → "Sable Ri
 
 - Fund identity is a normalised-name match with aliases; the duplicates panel catches the rest but needs a human click.
 - Legacy `.xls` / `.doc` / `.ppt` are skipped (`.xlsx` / `.docx` / `.pptx` work). Images (PNG, JPG, WebP, TIFF) are read as scans.
-- Single-user demo: anyone with the URL can read the extracted data. Put it behind IAP or add an app password before using real documents.
+- Single-user by design: one app password, no per-user roles or per-document permissions.
 - Drive `changes.list` instead of listing, Cloud Scheduler instead of the in-process loop (commands in `deploy/cloud_run.sh`), and a BigQuery export of `observations` would be the production shape.
 
 Nothing in `corpus/` is real: five fictional managers, generated numbers.
