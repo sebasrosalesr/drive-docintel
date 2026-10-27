@@ -29,6 +29,15 @@ class Unsupported(Exception):
     pass
 
 
+def _table_effort(effort: str | None) -> str:
+    """The think a spreadsheet or CSV gets. The rows are already structured, so the
+    default is the lighter TABLE_REASONING_EFFORT; a caller who asked for something
+    other than the house default (a deliberate re-read at high) is honoured."""
+    if effort and effort != settings.reasoning_effort:
+        return effort
+    return settings.table_reasoning_effort
+
+
 def sha256(data: bytes | str) -> str:
     return hashlib.sha256(data.encode() if isinstance(data, str) else data).hexdigest()
 
@@ -154,12 +163,12 @@ def process_bytes(
             ex, meta = llm.extract(name, image=(data, r.image_mime), effort=effort, model=model, transport=transport)
         elif r.kind in ("csv", "xlsx") and r.table and len(r.table) > LARGE_TABLE_ROWS:
             from .tabular import apply_mapping
-            mp, meta = llm.map_table(name, r.table, effort=effort, model=model, transport=transport)
+            mp, meta = llm.map_table(name, r.table, effort=_table_effort(effort), model=model, transport=transport)
             ex, skipped = apply_mapping(r.table, mp)
             mapped = True
             log.info("%s: %d rows mapped (%s layout), %d skipped", name, len(ex.metrics), mp.layout, len(skipped))
         else:
-            ex, meta = llm.extract(name, text=r.text, kind=r.kind, effort=effort, model=model, transport=transport)
+            ex, meta = llm.extract(name, text=r.text, kind=r.kind, effort=_table_effort(effort) if r.kind in ("csv", "xlsx") else effort, model=model, transport=transport)
     except Exception as exc:  # noqa: BLE001  the row must record why
         doc.status = "failed"
         doc.error = f"{type(exc).__name__}: {exc}"[:2000]

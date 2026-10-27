@@ -145,6 +145,7 @@ Example Ask, real run: *"Which fund had the best January return?"* → "Sable Ri
 
 ## Operations
 
+- `TABLE_REASONING_EFFORT` (default `low`) is the think a spreadsheet or CSV gets; PDFs and prose keep `REASONING_EFFORT`. A small CSV read in 25 s at medium and a few seconds at low.
 - `APP_PASSWORD` locks every API route behind a sign-in screen (for a deployed demo). `DAILY_COST_CAP_USD` stops model calls once today's spend reaches the cap; the Connect page shows today's spend and the reader version, with "Re-read everything" / "Re-read the outdated" buttons.
 - Document **History** (drawer tab) lists every reading of a file with a diff of figures against the previous one. **These look like the same fund** (Data page) suggests duplicate funds and merges them with one click, keeping the other name as an alias.
 - `.eml` attachments (PDF, CSV, Excel, Word…) are read as their own documents, linked to the email.

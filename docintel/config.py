@@ -32,6 +32,8 @@ class Settings:
     fallback_model: str
     pdf_engine: str
     reasoning_effort: str
+    # Spreadsheets and CSVs are already structured: a lighter think is enough and several times faster.
+    table_reasoning_effort: str
     app_secret: str
     base_url: str
     database_url: str
@@ -73,6 +75,7 @@ def load() -> Settings:
         fallback_model=_s("FALLBACK_MODEL") if os.getenv("FALLBACK_MODEL") is not None else "anthropic/claude-opus-5.5",
         pdf_engine=_s("PDF_ENGINE", "native"),
         reasoning_effort=_s("REASONING_EFFORT", "medium"),
+        table_reasoning_effort=_s("TABLE_REASONING_EFFORT", "low").lower(),
         app_secret=_s("APP_SECRET", "dev-secret-change-me"),
         base_url=_s("BASE_URL", "http://localhost:8080").rstrip("/"),
         database_url=_s("DATABASE_URL"),
