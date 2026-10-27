@@ -135,6 +135,18 @@ details summary { cursor: pointer; color: var(--ink-2); font-weight: 500; }
 
 /* ---- native previews ---- */
 .preview-frame { width: 100%; height: 66vh; border: 1px solid var(--vein); border-radius: 10px; background: #fff; }
+.preview-tools { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; }
+/* The original filling the window: above the drawer (21) and the tour (50). */
+.preview-full { position: fixed; inset: 0; z-index: 60; background: var(--paper); display: flex; flex-direction: column; }
+.preview-full-bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--gold-line); background: var(--paper); }
+.preview-full-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-full-bar kbd { font: inherit; font-size: 11px; padding: 1px 5px; margin-left: 4px; border: 1px solid var(--vein); border-radius: 4px; opacity: .8; }
+.preview-full-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.preview-full .preview-frame { flex: 1; height: auto; min-height: 0; border: 0; border-radius: 0; }
+.preview-full .sheet { padding: 12px 16px; }
+.preview-full .sheet-scroll { max-height: none; }
+.preview-full .docx-page, .preview-full .email-card, .preview-full pre { margin: 12px 16px; }
+.preview-full pre { max-height: none !important; }
 .sheet-tabs { display: flex; gap: 2px; margin-bottom: 6px; }
 .sheet-tabs button { border: 1px solid var(--vein); border-bottom: none; background: var(--marble-2); padding: 5px 12px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 12.5px; color: var(--muted); }
 .sheet-tabs button.active { background: #fff; color: var(--ink); font-weight: 600; }

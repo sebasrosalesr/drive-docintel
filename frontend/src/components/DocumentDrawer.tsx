@@ -4,6 +4,7 @@ import { docTypeLabel, flagText, metricLabel, Mode, periodLabel, statusLabel, ba
 import Chip from "./Chip";
 import Drawer from "./Drawer";
 import FileBadge from "./FileBadge";
+import FullPreview from "./FullPreview";
 import Preview, { PreviewData } from "./Preview";
 
 type Tab = "original" | "figures" | "facts" | "history" | "text" | "json";
@@ -15,12 +16,13 @@ export default function DocumentDrawer({ docId, onClose, mode, page }: { docId: 
   const [lookFor, setLookFor] = useState<{ text: string; page: number } | null>(null);
   const showInOriginal = (text: string, pg: number) => { setLookFor({ text, page: pg }); setTab("original"); };
   const [tab, setTab] = useState<Tab>("original");
+  const [full, setFull] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [me, setMe] = useState<Me | null>(null);
   useEffect(() => { get<Me>("/api/me").then(setMe).catch(() => {}); }, []);
   useEffect(() => {
-    setDoc(null); setPrev(null); setErr(""); setTab("original"); setLookFor(null);
+    setDoc(null); setPrev(null); setErr(""); setTab("original"); setLookFor(null); setFull(false);
     if (docId == null) return;
     get(`/api/documents/${docId}`).then(setDoc).catch((e) => setErr(String(e)));
     get(`/api/documents/${docId}/preview`).then(setPrev).catch(() => setPrev({ kind: "text", text: "", note: "Preview unavailable" }));
@@ -78,7 +80,14 @@ export default function DocumentDrawer({ docId, onClose, mode, page }: { docId: 
           {it && <button className={tab === "json" ? "active" : ""} onClick={() => setTab("json")}>Raw JSON</button>}
         </div>
         {tab === "original" && lookFor && <div className="lookfor"><span className="eyebrow">Look for{lookFor.page ? ` on page ${lookFor.page}` : ""}</span><span className="evidence">“{lookFor.text}”</span><button className="linkish" onClick={() => setLookFor(null)}>clear</button></div>}
+        {tab === "original" && (
+          <div className="preview-tools">
+            <button className="btn ghost sm" onClick={() => setFull(true)} disabled={!prev} aria-label="Open the original in a full window">⤢ Full window</button>
+            {prev && (prev.kind === "pdf" || prev.kind === "html") && <a className="btn ghost sm" href={prev.url} target="_blank" rel="noopener noreferrer">Open in a new tab</a>}
+          </div>
+        )}
         {tab === "original" && <Preview data={prev} page={lookFor?.page || page} />}
+        {full && <FullPreview title={it ? doc.name : (doc.title || baseName(doc.name))} data={prev} page={lookFor?.page || page} onClose={() => setFull(false)} />}
         {tab === "figures" && (doc.observations.length === 0 ? <div className="empty">No figures were found in this document.</div> : (
           <table className="dt">
             <thead><tr><th>{it ? "Fund" : "Fund"}</th><th>{it ? "Metric" : "What"}</th><th>Period</th><th className="num">Value</th>{it && <th>Basis</th>}{it && <th>Conf.</th>}<th>{it ? "Evidence" : "Where it says so"}</th></tr></thead>
