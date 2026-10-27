@@ -30,20 +30,31 @@ put_secret OPENROUTER_API_KEY "$(val OPENROUTER_API_KEY)"
 put_secret GOOGLE_CLIENT_SECRET "$(val GOOGLE_CLIENT_SECRET)"
 put_secret APP_SECRET "$(val APP_SECRET)"
 put_secret DATABASE_URL "$(val DATABASE_URL)"
+put_secret APP_PASSWORD "$(val APP_PASSWORD)"
+
+# Originals, sample corpus and other files live on a bucket mounted into the container (Cloud Run disk is ephemeral).
+BUCKET="${BUCKET:-$PROJECT-docintel-data}"
+gcloud storage buckets describe "gs://$BUCKET" --project "$PROJECT" >/dev/null 2>&1 || \
+  gcloud storage buckets create "gs://$BUCKET" --project "$PROJECT" --location "$REGION" --uniform-bucket-level-access
 
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
 SA="$PROJECT_NUMBER-compute@developer.gserviceaccount.com"
-for s in OPENROUTER_API_KEY GOOGLE_CLIENT_SECRET APP_SECRET DATABASE_URL; do
-  gcloud secrets add-iam-policy-binding "$s" --project "$PROJECT" --member "serviceAccount:$SA" --role roles/secretmanager.secretAccessor >/dev/null
+for s in OPENROUTER_API_KEY GOOGLE_CLIENT_SECRET APP_SECRET DATABASE_URL APP_PASSWORD; do
+  gcloud secrets describe "$s" --project "$PROJECT" >/dev/null 2>&1 && \
+    gcloud secrets add-iam-policy-binding "$s" --project "$PROJECT" --member "serviceAccount:$SA" --role roles/secretmanager.secretAccessor >/dev/null
 done
+gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" --member "serviceAccount:$SA" --role roles/storage.objectAdmin >/dev/null
 
 echo "building $IMAGE"
 gcloud builds submit --tag "$IMAGE" --project "$PROJECT" --quiet
 BASE_URL="${BASE_URL:-https://$SERVICE-$PROJECT_NUMBER.$REGION.run.app}"
+SECRETS="OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,APP_SECRET=APP_SECRET:latest,DATABASE_URL=DATABASE_URL:latest"
+[ -n "$(val APP_PASSWORD)" ] && SECRETS="$SECRETS,APP_PASSWORD=APP_PASSWORD:latest"
 gcloud run deploy "$SERVICE" --image "$IMAGE" --project "$PROJECT" --region "$REGION" \
   --allow-unauthenticated --min-instances 1 --max-instances 1 --no-cpu-throttling --memory 1Gi --cpu 1 --timeout 300 \
-  --set-env-vars "GOOGLE_CLIENT_ID=$(val GOOGLE_CLIENT_ID),BASE_URL=$BASE_URL,MODEL=$(val MODEL),FALLBACK_MODEL=$(val FALLBACK_MODEL),PDF_ENGINE=$(val PDF_ENGINE),SYNC_INTERVAL_SECONDS=$(val SYNC_INTERVAL_SECONDS)" \
-  --set-secrets "OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,APP_SECRET=APP_SECRET:latest,DATABASE_URL=DATABASE_URL:latest"
+  --add-volume "name=data,type=cloud-storage,bucket=$BUCKET" --add-volume-mount "volume=data,mount-path=/mnt/data" \
+  --set-env-vars "GOOGLE_CLIENT_ID=$(val GOOGLE_CLIENT_ID),BASE_URL=$BASE_URL,MODEL=$(val MODEL),ASK_MODEL=$(val ASK_MODEL),FALLBACK_MODEL=$(val FALLBACK_MODEL),PDF_ENGINE=$(val PDF_ENGINE),SYNC_INTERVAL_SECONDS=$(val SYNC_INTERVAL_SECONDS),DATA_DIR=/mnt/data,PII_IDENTITY_POLICY=$(val PII_IDENTITY_POLICY),PII_REDACT=$(val PII_REDACT),DAILY_COST_CAP_USD=$(val DAILY_COST_CAP_USD)" \
+  --set-secrets "$SECRETS"
 echo
 # Alternative to the in-process loop (lets the service scale to zero): Cloud Scheduler calls /api/sync every minute.
 # Set SYNC_INTERVAL_SECONDS=0 to disable the in-process loop, deploy with --min-instances 0, then:

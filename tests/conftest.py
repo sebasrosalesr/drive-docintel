@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 _tmp = tempfile.mkdtemp(prefix="docintel-test-")
-os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{_tmp}/test.db")   # set DATABASE_URL to run the suite against Postgres
 os.environ["DATA_DIR"] = _tmp
 os.environ["OPENROUTER_API_KEY"] = "test-key"
 os.environ.setdefault("APP_SECRET", "test-secret")

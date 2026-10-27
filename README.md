@@ -69,13 +69,21 @@ Testing-mode consent expires after 7 days; the app notices the failed refresh an
 
 ## Deploy (optional)
 
-One Cloud Run service with one always-on instance (the sync loop runs in-process), Postgres on Neon, secrets in Secret Manager:
+Frontend and backend are one service: the container serves the API and the built app from the same origin (no CORS, one OAuth redirect URL). Hosting shape:
+
+| Piece | Where | Why |
+|---|---|---|
+| App (API + UI) | Cloud Run, one always-on instance (`min=max=1`, CPU not throttled) | the Drive watcher runs in-process; scale to zero + Cloud Scheduler if you prefer |
+| Database | Neon Postgres (`DATABASE_URL`) | Cloud Run's disk is wiped on restart, so SQLite is local-only |
+| Originals, sample corpus | a Cloud Storage bucket mounted at `/mnt/data` (`DATA_DIR`) | keeps "open original" and re-reads working across restarts |
+| Secrets | Secret Manager | OpenRouter key, Google client secret, app secret, database URL, app password |
 
 ```bash
+# .env: DATABASE_URL (Neon), GOOGLE_CLIENT_ID/SECRET, OPENROUTER_API_KEY, APP_SECRET, APP_PASSWORD
 PROJECT=<gcp-project> REGION=us-central1 bash deploy/cloud_run.sh
 ```
 
-Set `DATABASE_URL` in `.env` to the Neon connection string first; Cloud Run's disk is ephemeral so SQLite is local-only.
+The script enables the APIs, creates the Artifact Registry repo and the bucket, stores the secrets, builds with Cloud Build, deploys, and prints the URL to add to the OAuth client's redirect URIs.
 
 ## Decisions worth explaining
 
