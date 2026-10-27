@@ -4,7 +4,7 @@
 
 **Point it at a Google Drive folder of messy fund documents. Get one queryable table, with every number traced back to the line it came from.**
 
-![Python 3.12](https://img.shields.io/badge/Python-3.12-0B1424?labelColor=0B1424&color=C9A84C) ![FastAPI](https://img.shields.io/badge/FastAPI-SQLAlchemy_2-0B1424?labelColor=0B1424&color=C9A84C) ![React 18](https://img.shields.io/badge/React_18-Vite-0B1424?labelColor=0B1424&color=C9A84C) ![Claude via OpenRouter](https://img.shields.io/badge/Claude-via_OpenRouter-0B1424?labelColor=0B1424&color=C9A84C) ![tests](https://img.shields.io/badge/tests-60_pytest_·_6_vitest-0B1424?labelColor=0B1424&color=C9A84C)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-0B1424?labelColor=0B1424&color=C9A84C) ![FastAPI](https://img.shields.io/badge/FastAPI-SQLAlchemy_2-0B1424?labelColor=0B1424&color=C9A84C) ![React 18](https://img.shields.io/badge/React_18-Vite-0B1424?labelColor=0B1424&color=C9A84C) ![Claude via OpenRouter](https://img.shields.io/badge/Claude-via_OpenRouter-0B1424?labelColor=0B1424&color=C9A84C) ![tests](https://img.shields.io/badge/tests-_pytest_·_11_vitest-0B1424?labelColor=0B1424&color=C9A84C)
 
 </div>
 
